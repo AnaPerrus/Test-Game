@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Catcher — Juego sencillo en HTML</title>
+  <style>
+    :root{
+      --bg: #0f172a;         /* slate-900 */
+      --panel: #111827ea;    /* gray-900 */
+      --accent: #22d3ee;     /* cyan-400 */
+      --accent-2: #a78bfa;   /* violet-400 */
+      --good: #34d399;       /* emerald-400 */
+      --bad: #f87171;        /* red-400 */
+      --text: #e5e7eb;       /* gray-200 */
+      --muted: #9ca3af;      /* gray-400 */
+      --shadow: 0 10px 30px rgb(0 0 0 / 35%);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0; display:grid; place-items:center; background: radial-gradient(1200px 600px at 70% -10%, #1f2937, transparent), var(--bg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+    }
+
+    .wrap{ width:min(980px, 92vw); }
+
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:16px; margin-bottom:14px;
+    }
+    h1{ font-size: clamp(20px, 4vw, 28px); margin:0; letter-spacing:.5px; }
+    .badge{ color: var(--muted); font-size: 13px; margin-top:2px }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      padding: 14px 16px; box-shadow: var(--shadow);
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+    }
+
+    .stats{ display:flex; gap:14px; flex-wrap:wrap; }
+    .stat{ background: rgba(17,24,39,.6); border:1px solid rgba(255,255,255,.08); padding:10px 12px; border-radius:12px; min-width:92px; text-align:center }
+    .stat b{ display:block; font-size:20px; color:#fff }
+    .stat span{ font-size:12px; color:var(--muted) }
+
+    .controls{ display:flex; gap:10px; flex-wrap:wrap }
+    button{
+      appearance:none; border:none; cursor:pointer; padding:10px 14px; border-radius:12px;
+      background: linear-gradient(180deg, var(--accent), var(--accent-2)); color:#001018; font-weight:700;
+      box-shadow: 0 8px 20px rgba(34,211,238,.35);
+      transition: transform .08s ease, filter .2s ease, box-shadow .2s ease;
+    }
+    button.secondary{ background: transparent; color: var(--text); border:1px solid rgba(255,255,255,.14) }
+    button:active{ transform: translateY(1px) }
+
+    .board{
+      position:relative; height:min(560px, 70vh); border-radius: var(--radius); overflow:hidden;
+      background: radial-gradient(600px 300px at 20% -10%, rgba(34,211,238,.15), transparent),
+                  radial-gradient(800px 320px at 80% -10%, rgba(167,139,250,.12), transparent),
+                  linear-gradient(180deg, rgba(2,6,23,.8), rgba(2,6,23,.98));
+      border: 1px solid rgba(255,255,255,.08); box-shadow: var(--shadow);
+    }
+
+    /* Player */
+    .player{
+      position:absolute; bottom:16px; left:50%; translate:-50% 0; width:84px; height:20px; border-radius:12px;
+      background: linear-gradient(180deg,#e5e7eb,#9ca3af); box-shadow: inset 0 -3px 8px rgba(0,0,0,.35), 0 6px 16px rgba(0,0,0,.4);
+    }
+    .player::after{ content:""; position:absolute; inset:-8px -16px 6px; border-radius:16px; box-shadow: 0 0 0 1px rgba(255,255,255,.06) }
+
+    /* Falling items */
+    .item{ position:absolute; top:-40px; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:14px; }
+    .good{ background: radial-gradient(circle at 30% 30%, #6ee7b7, #10b981); color:#062a20; box-shadow: 0 6px 16px rgba(16,185,129,.35) }
+    .bad{ background: radial-gradient(circle at 30% 30%, #fb7185, #ef4444); color:#300307; box-shadow: 0 6px 16px rgba(239,68,68,.35) }
+
+    .toast{ position:absolute; left:50%; top:22%; translate:-50% -50%; font-size:24px; font-weight:800; opacity:0; pointer-events:none; }
+    .toast.show{ animation: pop .8s ease; }
+    @keyframes pop{ 0%{transform:scale(.7); opacity:0} 30%{transform:scale(1.05); opacity:1} 100%{transform:scale(1); opacity:0} }
+
+    footer{ margin-top:10px; color:var(--muted); font-size:12px; text-align:center }
+    kbd{ background:#111827; border:1px solid rgba(255,255,255,.1); padding:2px 6px; border-radius:6px; font-size:11px }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Catcher <span class="badge">• HTML + CSS + JS puro</span></h1>
+      </div>
+      <div class="controls panel">
+        <button id="startBtn">Iniciar</button>
+        <button id="pauseBtn" class="secondary">Pausa</button>
+        <button id="resetBtn" class="secondary">Reiniciar</button>
+      </div>
+    </header>
+
+    <div class="panel" aria-live="polite">
+      <div class="stats">
+        <div class="stat"><b id="score">0</b><span>Puntos</span></div>
+        <div class="stat"><b id="lives">3</b><span>Vidas</span></div>
+        <div class="stat"><b id="time">60</b><span>Segundos</span></div>
+        <div class="stat"><b id="best">0</b><span>Mejor</span></div>
+      </div>
+      <div>Controles: <kbd>←</kbd> <kbd>→</kbd> o arrastra/toca</div>
+    </div>
+
+    <div id="board" class="board" role="application" aria-label="Área del juego">
+      <div id="player" class="player" aria-label="Jugador"></div>
+      <div id="toast" class="toast"></div>
+    </div>
+
+    <footer>Idea: atrapa las fichas verdes (+1) y evita las rojas (‑1 vida). Termina cuando el tiempo llega a 0 o te quedas sin vidas.</footer>
+  </div>
+
+  <script>
+    (()=>{
+      const board = document.getElementById('board');
+      const player = document.getElementById('player');
+      const scoreEl = document.getElementById('score');
+      const livesEl = document.getElementById('lives');
+      const timeEl = document.getElementById('time');
+      const bestEl = document.getElementById('best');
+      const startBtn = document.getElementById('startBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const toast = document.getElementById('toast');
+
+      const state = {
+        running:false, paused:false, over:false,
+        score:0, lives:3, time:60,
+        speed: 140, // px/segundo base para caída
+        spawnEvery: 700, // ms
+        lastSpawn: 0,
+        items: new Set(),
+        lastTs: 0,
+      };
+
+      const clamp = (n, min, max)=> Math.max(min, Math.min(max, n));
+
+      function setBest(n){
+        try{ const prev = +localStorage.getItem('catcher_best') || 0; if(n>prev) localStorage.setItem('catcher_best', n); bestEl.textContent = Math.max(n, prev); }
+        catch{ bestEl.textContent = n; }
+      }
+      setBest(0);
+
+      function showToast(text, good=true){
+        toast.textContent = text;
+        toast.style.color = good ? 'var(--good)' : 'var(--bad)';
+        toast.classList.remove('show');
+        // Force reflow to restart animation
+        void toast.offsetWidth;
+        toast.classList.add('show');
+      }
+
+      function reset(gameOver=false){
+        // remove items
+        for(const el of state.items){ el.remove(); }
+        state.items.clear();
+        state.running=false; state.paused=false; state.over=false;
+        state.score=0; state.lives=3; state.time=60; state.speed=140; state.spawnEvery=700; state.lastSpawn=0; state.lastTs=0;
+        scoreEl.textContent='0'; livesEl.textContent='3'; timeEl.textContent='60';
+        if(gameOver) setBest(state.score);
+        // center player
+        player.style.left = `calc(50% - ${player.offsetWidth/2}px)`;
+      }
+
+      function start(){ if(state.over) reset(); state.running=true; state.paused=false; }
+      function pause(){ state.paused=!state.paused; pauseBtn.textContent = state.paused? 'Reanudar' : 'Pausa'; }
+
+      function spawn(ts){
+        if(ts - state.lastSpawn < state.spawnEvery) return;
+        state.lastSpawn = ts;
+        const el = document.createElement('div');
+        const isGood = Math.random() > 0.2; // 80% verdes
+        el.className = `item ${isGood? 'good':'bad'}`;
+        el.textContent = isGood ? '★' : '✖';
+        const x = Math.random() * (board.clientWidth - 28);
+        el.style.left = x + 'px';
+        el.style.top = '-32px';
+        el.dataset.vy = (state.speed + Math.random()*80).toString();
+        el.dataset.good = isGood ? '1':'0';
+        board.appendChild(el);
+        state.items.add(el);
+        // Progresión de dificultad
+        state.speed = Math.min(380, state.speed + 1.2);
+        state.spawnEvery = Math.max(260, state.spawnEvery - 4);
+      }
+
+      function rect(el){ return el.getBoundingClientRect(); }
+      function intersects(a,b){ return !(a.right<b.left || a.left>b.right || a.bottom<b.top || a.top>b.bottom); }
+
+      function update(dt, ts){
+        if(!state.running || state.paused) return;
+        // tiempo
+        state.time -= dt/1000; if(state.time<0) state.time=0;
+        timeEl.textContent = Math.ceil(state.time);
+        if(state.time === 0){ return gameOver(); }
+
+        // spawn
+        spawn(ts);
+
+        const pb = rect(player);
+        for(const el of [...state.items]){
+          const vy = +el.dataset.vy;
+          const y = (parseFloat(el.style.top) || -32) + vy * (dt/1000);
+          el.style.top = y + 'px';
+          // catch or out
+          if(y > board.clientHeight){
+            el.remove(); state.items.delete(el); continue;
+          }
+          const rb = rect(el);
+          if(intersects(pb, rb)){
+            const good = el.dataset.good === '1';
+            if(good){ state.score++; scoreEl.textContent = state.score; showToast('+1', true); }
+            else{ state.lives--; livesEl.textContent = state.lives; showToast('‑1 vida', false); if(state.lives<=0) return gameOver(); }
+            el.remove(); state.items.delete(el);
+          }
+        }
+      }
+
+      function gameOver(){
+        state.running=false; state.over=true; setBest(state.score);
+        showToast('Fin del juego', false);
+      }
+
+      function loop(ts){
+        if(!state.lastTs) state.lastTs = ts;
+        const dt = ts - state.lastTs; state.lastTs = ts;
+        if(state.running && !state.paused) update(dt, ts);
+        requestAnimationFrame(loop);
+      }
+
+      // Controls — keyboard
+      const keys = { left:false, right:false };
+      window.addEventListener('keydown', (e)=>{
+        if(e.key==='ArrowLeft' || e.key==='a') keys.left=true;
+        if(e.key==='ArrowRight' || e.key==='d') keys.right=true;
+        if(e.key.toLowerCase()==='p') pause();
+      });
+      window.addEventListener('keyup', (e)=>{
+        if(e.key==='ArrowLeft' || e.key==='a') keys.left=false;
+        if(e.key==='ArrowRight' || e.key==='d') keys.right=false;
+      });
+
+      function movePlayer(dt){
+        const speed = 420; // px/seg
+        const dx = (keys.right - keys.left) * speed * (dt/1000);
+        if(dx){
+          const cur = player.offsetLeft; // relative to board
+          const next = clamp(cur + dx, 0, board.clientWidth - player.clientWidth);
+          player.style.left = next + 'px';
+        }
+        requestAnimationFrame((ts)=>{
+          if(!movePlayer._last) movePlayer._last = ts;
+          const delta = ts - movePlayer._last; movePlayer._last = ts;
+          movePlayer(delta);
+        });
+      }
+      movePlayer(16);
+
+      // Controls — mouse/touch drag
+      let dragging = false, offsetX = 0;
+      function pointerX(evt){ return (evt.touches? evt.touches[0].clientX : evt.clientX) - board.getBoundingClientRect().left; }
+      board.addEventListener('pointerdown', (e)=>{ dragging=true; offsetX = pointerX(e) - player.offsetLeft; });
+      window.addEventListener('pointerup', ()=> dragging=false);
+      window.addEventListener('pointermove', (e)=>{
+        if(!dragging) return;
+        const x = pointerX(e) - offsetX;
+        const next = clamp(x, 0, board.clientWidth - player.clientWidth);
+        player.style.left = next + 'px';
+      }, {passive:true});
+
+      // Buttons
+      startBtn.addEventListener('click', ()=> start());
+      pauseBtn.addEventListener('click', ()=> pause());
+      resetBtn.addEventListener('click', ()=> reset());
+
+      // Resize safety: keep player inside
+      new ResizeObserver(()=>{
+        const next = clamp(player.offsetLeft, 0, board.clientWidth - player.clientWidth);
+        player.style.left = next + 'px';
+      }).observe(board);
+
+      // Kick things off
+      reset();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
